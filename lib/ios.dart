@@ -262,7 +262,9 @@ Future<void> createIcons(Config config, String? flavor) async {
   
   // Generate liquid glass .icon if configured
   if (config.hasLiquidGlassIconConfig) {
-    await generateLiquidGlassIcon(config, 'AppIcon');
+    await generateLiquidGlassIcon(config, iconName);
+    // Add .icon file reference to project.pbxproj
+    await addLiquidGlassIconToProject(iconName);
   }
 }
 
@@ -317,6 +319,101 @@ Image createResizedImage(IosIconTemplate template, Image image) {
       interpolation: Interpolation.linear,
     );
   }
+}
+
+/// Add liquid glass .icon file reference to project.pbxproj
+Future<void> addLiquidGlassIconToProject(String iconName) async {
+  final File iOSConfigFile = File(iosConfigFile);
+  if (!iOSConfigFile.existsSync()) {
+    printStatus('Warning: project.pbxproj not found, skipping .icon reference addition');
+    return;
+  }
+
+  final List<String> lines = await iOSConfigFile.readAsLines();
+  final String iconPath = '$iconName.icon';
+  
+  // Check if .icon reference already exists
+  final bool alreadyExists = lines.any((line) => line.contains(iconPath));
+  if (alreadyExists) {
+    printStatus('Liquid glass .icon reference already exists in project.pbxproj');
+    return;
+  }
+
+  // Generate unique IDs for the .icon file references
+  final String fileRefId = _generateUniqueId();
+  final String buildFileId = _generateUniqueId();
+  
+  // Find insertion points
+  int? fileRefInsertIndex;
+  int? buildFileInsertIndex;
+  int? resourcesInsertIndex;
+  
+  for (int i = 0; i < lines.length; i++) {
+    final String line = lines[i];
+    
+    // Find PBXFileReference section
+    if (line.contains('/* Begin PBXFileReference section */') && fileRefInsertIndex == null) {
+      // Insert after the first existing file reference
+      for (int j = i + 1; j < lines.length; j++) {
+        if (lines[j].trim().endsWith('};') && lines[j].contains('isa = PBXFileReference')) {
+          fileRefInsertIndex = j + 1;
+          break;
+        }
+      }
+    }
+    
+    // Find PBXBuildFile section
+    if (line.contains('/* Begin PBXBuildFile section */') && buildFileInsertIndex == null) {
+      // Insert after the first existing build file
+      for (int j = i + 1; j < lines.length; j++) {
+        if (lines[j].trim().endsWith('};') && lines[j].contains('isa = PBXBuildFile')) {
+          buildFileInsertIndex = j + 1;
+          break;
+        }
+      }
+    }
+    
+    // Find Resources section
+    if (line.contains('in Resources */') && resourcesInsertIndex == null) {
+      resourcesInsertIndex = i + 1;
+    }
+  }
+  
+  // Add PBXFileReference entry
+  if (fileRefInsertIndex != null) {
+    lines.insert(fileRefInsertIndex, '\t\t$fileRefId /* $iconPath */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = $iconPath; sourceTree = "<group>"; };');
+  }
+  
+  // Add PBXBuildFile entry
+  if (buildFileInsertIndex != null) {
+    lines.insert(buildFileInsertIndex + (fileRefInsertIndex != null && buildFileInsertIndex > fileRefInsertIndex ? 1 : 0), 
+                 '\t\t$buildFileId /* $iconPath in Resources */ = {isa = PBXBuildFile; fileRef = $fileRefId /* $iconPath */; };');
+  }
+  
+  // Add to Resources section
+  if (resourcesInsertIndex != null) {
+    final int adjustedIndex = resourcesInsertIndex + 
+                             (fileRefInsertIndex != null && resourcesInsertIndex > fileRefInsertIndex ? 1 : 0) +
+                             (buildFileInsertIndex != null && resourcesInsertIndex > buildFileInsertIndex ? 1 : 0);
+    lines.insert(adjustedIndex, '\t\t\t\t$buildFileId /* $iconPath in Resources */,');
+  }
+  
+  final String entireFile = '${lines.join('\n')}\n';
+  await iOSConfigFile.writeAsString(entireFile);
+  
+  printStatus('Added liquid glass .icon reference to project.pbxproj');
+}
+
+/// Generate a unique ID for Xcode project file references
+/// Uses a format similar to existing Xcode IDs (24 character hex string)
+String _generateUniqueId() {
+  final DateTime now = DateTime.now();
+  final int timestamp = now.millisecondsSinceEpoch;
+  final int random = timestamp.hashCode;
+  
+  // Generate a 24-character hex string similar to Xcode's format
+  final String hex = (timestamp ^ random).abs().toRadixString(16).toUpperCase();
+  return hex.padLeft(24, '0').substring(0, 24);
 }
 
 /// Change the iOS launcher icon
