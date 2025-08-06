@@ -6,6 +6,7 @@ import 'dart:io';
 import 'package:flutter_launcher_icons/config/config.dart';
 import 'package:flutter_launcher_icons/constants.dart';
 import 'package:flutter_launcher_icons/custom_exceptions.dart';
+import 'package:flutter_launcher_icons/ios_liquid_glass_icon_generator.dart';
 import 'package:flutter_launcher_icons/utils.dart';
 import 'package:image/image.dart';
 
@@ -258,6 +259,11 @@ Future<void> createIcons(Config config, String? flavor) async {
     await modifyDefaultContentsFile(iconName, darkIconName, tintedIconName);
   }
   await Future.wait(concurrentIconUpdates);
+  
+  // Generate liquid glass .icon if configured
+  if (config.hasLiquidGlassIconConfig) {
+    await generateLiquidGlassIcon(config, 'AppIcon');
+  }
 }
 
 /// Note: Do not change interpolation unless you end up with better results (see issue for result when using cubic
