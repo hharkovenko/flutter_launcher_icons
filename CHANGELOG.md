@@ -2,7 +2,7 @@
 
 ## 0.14.5 (11th August 2025)
 
-- iOS: Added support for liquid glass icon generation [#XXX](https://github.com/fluttercommunity/flutter_launcher_icons/pull/XXX)
+- iOS: Added support for liquid glass icon generation
   - New liquid glass .icon format support for modern iOS app icons
   - Configurable glass effects, shadows, translucency, and positioning
   - Support for both neutral and chromatic shadow types
